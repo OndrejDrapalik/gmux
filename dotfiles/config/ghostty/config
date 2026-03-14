@@ -1,0 +1,50 @@
+font-family = "Geist Mono"
+
+theme = "light:tokyonight-day,dark:tokyonight"
+# Override ANSI green + bright green with vivid lime (instead of Tokyo Night's muted green)
+palette = 2=#60D701
+palette = 10=#60D701
+background = #181818
+
+background-opacity = 0.95
+background-blur-radius = 40
+
+background-image = /Users/drew/.config/ghostty/backgrounds/arrietty.png
+background-image-fit = cover
+background-image-opacity = 0.05
+
+cursor-style-blink = true
+window-padding-x = 10
+window-padding-y = 10
+
+window-padding-color = extend
+window-padding-balance = true
+macos-titlebar-style = tabs
+
+selection-invert-fg-bg = true
+keybind = super+f=write_screen_file:open
+keybind = shift+enter=text:\n
+# Unbind default Ghostty tab switching (super+digit_X=goto_tab)
+keybind = super+digit_1=unbind
+keybind = super+digit_2=unbind
+keybind = super+digit_3=unbind
+
+# Cmd+`/1 for tmux pane cycling (sends M-`/M-1)
+keybind = super+grave_accent=text:\x1b\x60
+keybind = super+1=text:\x1b1
+
+# Cmd+2/3 for tmux window navigation (sends M-2/M-3)
+keybind = super+2=text:\x1b2
+keybind = super+3=text:\x1b3
+
+# Opt+Cmd+1/2 for tmux window reordering (sends M-!/M-@)
+keybind = cmd+opt+1=text:\x1b!
+keybind = cmd+opt+2=text:\x1b@
+
+keybind = super+shift+k=text:\x1bK
+
+# Hyper+m for tmux pane zoom toggle (Karabiner sends F18 in Ghostty, we translate to M-m)
+keybind = f18=text:\x1bm
+
+working-directory = /Users/drew
+window-inherit-working-directory = false

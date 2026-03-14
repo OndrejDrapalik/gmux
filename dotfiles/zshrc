@@ -1,0 +1,44 @@
+# Local bin
+export PATH="$HOME/.local/bin:$PATH"
+
+# Oh My Zsh
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git fzf-tab zsh-autosuggestions zsh-syntax-highlighting)
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+source $ZSH/oh-my-zsh.sh
+
+# Git aliases
+alias ga="git add ."
+alias gc="git commit -m"
+alias gr="git restore . && git clean -fd"
+alias gp="git push origin HEAD"
+alias gd="git diff"
+alias gs="git status"
+alias gco="git checkout"
+alias gch="git checkout"
+alias gcb="git checkout -b"
+alias gpl='git pull origin $(git branch --show-current)'
+alias gpom="git pull origin main"
+alias lg="lazygit"
+
+# Python
+alias py=python3
+alias python=python3
+
+
+# Cmd+Shift+K clear (Ghostty sends \eK; tmux handles it via M-K, this covers bare shell)
+_clear_screen_scrollback() {
+  printf '\033[2J\033[3J\033[H'
+  zle reset-prompt
+}
+zle -N _clear_screen_scrollback
+bindkey '\eK' _clear_screen_scrollback
+
+# fzf-tab config
+[[ -f ~/.config/zsh/fzf-tab-config.zsh ]] && source ~/.config/zsh/fzf-tab-config.zsh
+
+# Claude Code
+CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1
+export USE_BUILTIN_RIPGREP=0
+export LANG=C.UTF-8
