@@ -10,7 +10,7 @@ actions — no prefix gymnastics.
 
 gstack is the brain. gmux is the trenches.
 
-![gmux demo](assets/hero-demo.gif)
+<img src="assets/hero-demo.gif" alt="gmux demo" width="100%">
 
 ## What's Inside
 
