@@ -1,17 +1,19 @@
-font-family = "Geist Mono"
+font-family = "JetBrains Mono"
+font-size = 13
+adjust-cell-height = 15%
 
 theme = "light:tokyonight-day,dark:tokyonight"
-# Override ANSI green + bright green with vivid lime (instead of Tokyo Night's muted green)
 palette = 2=#60D701
 palette = 10=#60D701
-background = #181818
+background = #101117
 
-background-opacity = 0.95
+
+background-opacity = 1
 background-blur-radius = 40
 
 background-image = /Users/drew/.config/ghostty/backgrounds/arrietty.png
 background-image-fit = cover
-background-image-opacity = 0.05
+background-image-opacity = 0.04
 
 cursor-style-blink = true
 window-padding-x = 10
@@ -29,22 +31,52 @@ keybind = super+digit_1=unbind
 keybind = super+digit_2=unbind
 keybind = super+digit_3=unbind
 
-# Cmd+`/1 for tmux pane cycling (sends M-`/M-1)
+# Cmd+` cycles panes; Cmd+1 selects the previous tmux window.
 keybind = super+grave_accent=text:\x1b\x60
 keybind = super+1=text:\x1b1
 
-# Cmd+2/3 for tmux window navigation (sends M-2/M-3)
+# Cmd+2 selects the next tmux window; Cmd+3 cycles panes in reverse.
 keybind = super+2=text:\x1b2
 keybind = super+3=text:\x1b3
+
+# Cmd+Shift+[/] mirror Cmd+1/Cmd+2 for tmux window navigation (prev/next)
+keybind = super+shift+left_bracket=text:\x1b1
+keybind = super+shift+right_bracket=text:\x1b2
 
 # Opt+Cmd+1/2 for tmux window reordering (sends M-!/M-@)
 keybind = cmd+opt+1=text:\x1b!
 keybind = cmd+opt+2=text:\x1b@
 
+# Cmd+Shift+K clears the current pane. H/J/L share the same tmux Meta bindings
+# as Opt+Cmd+H/J/L in the gmux flavor.
 keybind = super+shift+k=text:\x1bK
+keybind = super+shift+h=text:\x1bH
+keybind = super+shift+j=text:\x1bJ
+keybind = super+shift+l=text:\x1bL
 
-# Hyper+m for tmux pane zoom toggle (Karabiner sends F18 in Ghostty, we translate to M-m)
+# Cmd+p for tmux recursive pane splitting (sends M-p)
+keybind = cmd+p=text:\x1bp
+
+# Cmd+Shift+p copies tmux current pane path (sends M-P)
+keybind = cmd+shift+p=text:\x1bP
+
+# Cmd+hjkl for tmux directional pane navigation (sends M-h/M-j/M-k/M-l)
+# super+h overrides macOS "Hide App" only while Ghostty is focused
+keybind = super+h=text:\x1bh
+keybind = super+j=text:\x1bj
+keybind = super+k=text:\x1bk
+keybind = super+l=text:\x1bl
+
+# Opt+Cmd+hjkl: swap-pane in direction. Uppercase HJL avoid clobbering existing
+# Cmd+Shift+K=M-K (clear-screen at line 43); K instead sends M-C-k (\x1b\x0b)
+keybind = cmd+opt+h=text:\x1bH
+keybind = cmd+opt+j=text:\x1bJ
+keybind = cmd+opt+k=text:\x1b\x0b
+keybind = cmd+opt+l=text:\x1bL
+
+# Hyper+m / Cmd+m for tmux pane zoom toggle (both translate to M-m)
 keybind = f18=text:\x1bm
+keybind = super+m=text:\x1bm
 
 working-directory = /Users/drew
 window-inherit-working-directory = false

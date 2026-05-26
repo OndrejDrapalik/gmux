@@ -94,7 +94,7 @@ loop() {
 			tmux set -gq @tmux_live_port_windows "${live_windows}" >/dev/null 2>&1 || true
 			# Set per-window @has_port for instant format-string rendering.
 			# Ordering: seed @pulse BEFORE @has_port=1, clear @has_port BEFORE @pulse
-			# to prevent empty flash.
+			# to prevent empty flash (same pattern as agent shimmer).
 			while IFS=$'\t' read -r wid wname; do
 				[[ -z "${wid}" ]] && continue
 				has=0

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refresh all panes in current window: sends Enter + clears screen.
 # Skips panes that are:
-#   - Running claude or codex (AI agent sessions)
+#   - Running claude, codex, or opencode (AI agent sessions)
 #   - Running a process listening on a localhost port (dev servers)
 
 set -eu
@@ -12,7 +12,7 @@ port_pane_ids=$(
   {
     tmux list-panes -F 'P #{pane_id} #{pane_pid}' 2>/dev/null
     ps -axo pid=,ppid= | awk '{ print "R " $1 " " $2 }'
-    lsof -nP -iTCP -sTCP:LISTEN -Fp 2>/dev/null | awk '
+    lsof -nP -iTCP -sTCP:LISTEN -FpPn 2>/dev/null | awk '
       /^p[0-9]/ { pid = substr($0, 2) }
       /^n/ && pid != "" {
         port = $0; sub(/^.*:/, "", port); sub(/[^0-9].*$/, "", port)
@@ -50,8 +50,9 @@ for entry in $(tmux list-panes -F '#{pane_id}:#{pane_pid}'); do
     *" $id "*) continue ;;
   esac
 
-  # Skip panes running claude or codex
-  if pgrep -P "$pid" "claude|codex" >/dev/null 2>&1; then
+  # Skip panes running an agent harness, including wrapped or nested launches.
+  detector="${GMUX_AGENT_DETECT:-${HOME}/.tmux/scripts/tmux-agent-detect.sh}"
+  if "$detector" pane-agent "$pid" >/dev/null 2>&1; then
     continue
   fi
 
