@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-# Lean braille spinner for tmux. Writes ONE global @spin option at 5 fps
-# when any window has @busy=1; idles otherwise. Format reads #{@spin} —
-# no per-window writes, no refresh-client spam, no capture-pane.
-#
-# Detection (setting @busy) is handled by tmux-window-status.sh at
-# status-interval cadence. This script only animates the glyph.
+# Lean braille spinner for tmux.
+# Two processes: __scan (busy detection, every SCAN_INTERVAL, hysteresis on idle)
+# and __loop (pure animation at ~8fps, one tmux fork per frame, never blocks on scans).
+# Scanner writes per-window @busy + global @busy_any; animation only reads @busy_any.
 
 set -u
 
@@ -20,37 +18,138 @@ is_running() {
 	ps -p "${pid}" -o command= 2>/dev/null | grep -q "tmux-agent-spinner.sh __loop"
 }
 
-# Braille spinner — 10 frames, classic "dots" rotation.
+# Braille spinner — 8 frames, classic "dots" rotation.
 CHARS=(⠹ ⢸ ⣰ ⣤ ⣆ ⡇ ⠏ ⠛)
 N=${#CHARS[@]}
+SCAN_INTERVAL=3
+SPIN_INTERVAL=0.12
+# Consecutive idle scans required before a busy window is marked idle.
+# Bridges short gaps (tool-call boundaries, turn transitions) so the
+# spinner runs continuously start-to-end of a task.
+MISS_LIMIT=3
+
+TITLE_BUSY_RE='^([⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠂⠒⠢⠆⠐⠠⠄◐◓◑◒|/\-] )'
+
+clear_spin() {
+	tmux set -gqu @spin \; refresh-client -S 2>/dev/null || true
+}
+
+pane_is_busy() {
+	local pane_id="$1" pane_cmd="$2" pane_title="$3" pane_tty="$4"
+
+	# Cheapest check first: live spinner prefix in the pane title.
+	if printf "%s" "${pane_title}" | grep -qE "${TITLE_BUSY_RE}"; then
+		return 0
+	fi
+
+	# Only agent panes warrant a capture-pane.
+	case "${pane_cmd}" in
+		*claude* | *codex* | [0-9]*.[0-9]*.[0-9]*) ;;
+		*)
+			ps -t "${pane_tty##*/}" -o command= 2>/dev/null | grep -qiE '(^|/)(claude|codex)( |$|-)' || return 1
+			;;
+	esac
+
+	# Visible pane only — scrollback can hold a stale marker.
+	tmux capture-pane -p -J -t "${pane_id}" 2>/dev/null | grep -q 'esc to interrupt'
+}
+
+update_window_state() {
+	local window_id window_name pane_id pane_cmd pane_title pane_tty
+	local busy_now prev_busy prev_miss miss any_busy
+	local busy_windows=" "
+	local -a batch=()
+
+	while IFS=$'\t' read -r window_id pane_id pane_cmd pane_title pane_tty; do
+		case "${busy_windows}" in *" ${window_id} "*) continue ;; esac
+		if pane_is_busy "${pane_id}" "${pane_cmd}" "${pane_title}" "${pane_tty}"; then
+			busy_windows="${busy_windows}${window_id} "
+		fi
+	done < <(tmux list-panes -a -F '#{window_id}	#{pane_id}	#{pane_current_command}	#{pane_title}	#{pane_tty}' 2>/dev/null || true)
+
+	any_busy=0
+	while IFS=$'\t' read -r window_id window_name prev_busy prev_miss; do
+		[ -n "${window_id}" ] || continue
+		batch+=(set-option -wqt "${window_id}" @wname "${window_name}" \;)
+
+		case "${busy_windows}" in
+			*" ${window_id} "*) busy_now=1 ;;
+			*) busy_now=0 ;;
+		esac
+
+		if [ "${busy_now}" -eq 1 ]; then
+			any_busy=1
+			[ "${prev_busy}" = "1" ] || batch+=(set-option -wqt "${window_id}" @busy 1 \;)
+			[ "${prev_miss:-0}" = "0" ] || [ -z "${prev_miss}" ] || batch+=(set-option -wqt "${window_id}" @busy_miss 0 \;)
+		elif [ "${prev_busy}" = "1" ]; then
+			# Hysteresis: tolerate short detection gaps before going idle.
+			miss=$(( ${prev_miss:-0} + 1 ))
+			if [ "${miss}" -ge "${MISS_LIMIT}" ]; then
+				batch+=(set-option -wqt "${window_id}" @busy 0 \; set-option -wqt "${window_id}" @busy_miss 0 \;)
+			else
+				any_busy=1
+				batch+=(set-option -wqt "${window_id}" @busy_miss "${miss}" \;)
+			fi
+		else
+			[ "${prev_busy}" = "0" ] || batch+=(set-option -wqt "${window_id}" @busy 0 \;)
+		fi
+	done < <(tmux list-windows -a -F '#{window_id}	#{window_name}	#{@busy}	#{@busy_miss}' 2>/dev/null || true)
+
+	batch+=(set -gq @busy_any "${any_busy}")
+	tmux "${batch[@]}" 2>/dev/null || true
+}
+
+scan_loop() {
+	while true; do
+		if ! tmux has-session 2>/dev/null; then
+			exit 0
+		fi
+		if [ -z "$(tmux list-clients -F x 2>/dev/null)" ]; then
+			tmux set -gq @busy_any 0 2>/dev/null || true
+			sleep 5
+			continue
+		fi
+		update_window_state
+		sleep "${SCAN_INTERVAL}"
+	done
+}
 
 loop() {
-	local i=0
-	local last=""
+	local scan_pid i ch busy last
+	"$0" __scan &
+	scan_pid=$!
+	trap 'kill "${scan_pid}" 2>/dev/null; exit 0' EXIT TERM INT
+
+	i=0
+	last=""
 	while true; do
-		# No clients attached → sleep deep, skip everything.
-		if [ -z "$(tmux list-clients -F x 2>/dev/null)" ]; then
-			[ -n "${last}" ] && { tmux set -gqu @spin 2>/dev/null || true; last=""; }
+		busy="$(tmux show -gqv @busy_any 2>/dev/null)" || {
+			tmux has-session 2>/dev/null || exit 0
 			sleep 2
 			continue
-		fi
+		}
 
-		# Any window currently busy?
-		if ! tmux list-windows -a -F '#{@busy}' 2>/dev/null | grep -q '^1$'; then
-			# Idle — clear @spin once, then poll slowly.
-			[ -n "${last}" ] && { tmux set -gqu @spin 2>/dev/null || true; last=""; }
-			sleep 1
+		if [ "${busy}" != "1" ]; then
+			if [ -n "${last}" ]; then
+				clear_spin
+				last=""
+			fi
+			sleep 0.5
 			continue
 		fi
 
-		# Animate.
-		local ch="${CHARS[$i]}"
-		if [ "${ch}" != "${last}" ]; then
-			tmux set -gq @spin "${ch}" 2>/dev/null || true
-			last="${ch}"
-		fi
+		# Animate — single tmux fork per frame, busy state read in the same call.
+		ch="${CHARS[$i]}"
+		busy="$(tmux set -gq @spin "${ch}" \; refresh-client -S \; show -gqv @busy_any 2>/dev/null || true)"
+		last="${ch}"
 		i=$(( (i + 1) % N ))
-		sleep 0.15
+		while [ "${busy}" = "1" ]; do
+			sleep "${SPIN_INTERVAL}"
+			ch="${CHARS[$i]}"
+			busy="$(tmux set -gq @spin "${ch}" \; refresh-client -S \; show -gqv @busy_any 2>/dev/null || true)"
+			last="${ch}"
+			i=$(( (i + 1) % N ))
+		done
 	done
 }
 
@@ -58,11 +157,16 @@ case "${1:-start}" in
 	__loop)
 		loop
 		;;
+	__scan)
+		scan_loop
+		;;
 	start)
 		if is_running; then
 			exit 0
 		fi
 		rm -f "${PIDFILE}"
+		pkill -f 'tmux-agent-spinner.sh __' 2>/dev/null || true
+		clear_spin
 		nohup "$0" __loop >/dev/null 2>&1 &
 		echo "$!" > "${PIDFILE}"
 		;;
@@ -70,7 +174,7 @@ case "${1:-start}" in
 		if is_running; then
 			kill "$(cat "${PIDFILE}")" 2>/dev/null || true
 		fi
-		pkill -f 'tmux-agent-spinner.sh __loop' 2>/dev/null || true
+		pkill -f 'tmux-agent-spinner.sh __' 2>/dev/null || true
 		rm -f "${PIDFILE}"
 		;;
 	restart)

@@ -19,6 +19,15 @@ agent_from_basename() {
 		.claude-code-wrapped | claude | claude-code) printf 'claude' ;;
 		.codex-wrapped | codex) printf 'codex' ;;
 		.opencode-wrapped | opencode | open-code) printf 'opencode' ;;
+		.gemini-wrapped | gemini) printf 'gemini' ;;
+		.cursor-agent-wrapped | cursor-agent) printf 'cursor' ;;
+		.droid-wrapped | droid) printf 'droid' ;;
+		.amp-wrapped | amp | amp-local) printf 'amp' ;;
+		.copilot-wrapped | copilot | github-copilot | ghcs) printf 'copilot' ;;
+		.grok-wrapped | grok | grok-build) printf 'grok' ;;
+		.kiro-wrapped | kiro | kiro-cli) printf 'kiro' ;;
+		.kimi-wrapped | kimi | kimi-code) printf 'kimi' ;;
+		.cline-wrapped | cline) printf 'cline' ;;
 		*) return 1 ;;
 	esac
 }
@@ -203,14 +212,47 @@ pane_title() {
 	fi
 }
 
+# Multibyte glyphs matched as alternations under LC_ALL=C — bracket classes
+# of multibyte chars silently fail on C-locale grep (Docker) and BSD grep.
 has_working_title() {
-	printf '%s' "${1:-}" | grep -qE '^([⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠂⠒⠢⠆⠐⠠⠄◐◓◑◒|/\\-] )'
+	local braille=$'\xe2[\xa0-\xa3][\x80-\xbf]'
+	printf '%s' "${1:-}" | LC_ALL=C grep -qE "^((${braille})+|◐|◓|◑|◒|◔|◕|[|/\\-]) "
+}
+
+# Permission/confirm prompts mean the agent is waiting on the user, not
+# working — they win over interrupt footers that share the same dialog.
+has_blocked_screen() {
+	local lower
+	lower="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+	if printf '%s' "${lower}" | LC_ALL=C grep -qE 'press enter to confirm or esc to cancel|waiting for permission|waiting for approval|waiting for user confirmation|permission required|requesting approval|requires approval|let cline use this tool'; then
+		return 0
+	fi
+	if printf '%s' "${lower}" | LC_ALL=C grep -qE 'do you want to proceed|would you like to proceed'; then
+		printf '%s' "${lower}" | LC_ALL=C grep -qE '1\. yes|❯' && return 0
+	fi
+	return 1
 }
 
 has_working_screen() {
 	local lower
 	lower="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
-	printf '%s' "${lower}" | grep -Eq 'esc to interrupt|ctrl\+c to interrupt|esc.*interrupt|esc to cancel|ctrl\+c to stop'
+	printf '%s' "${lower}" | LC_ALL=C grep -Eq 'esc to interrupt|ctrl\+c to interrupt|esc.*interrupt|esc to cancel|ctrl\+c to stop|esc to stop|esc again to cancel|ctrl\+c cancel|kiro is working|• working \('
+}
+
+# Spinner glyph at line start followed by an activity word. Braille frames
+# (opencode/cursor/droid/grok) are matched as UTF-8 bytes (U+2800-U+28FF)
+# under LC_ALL=C so every frame works on BSD and GNU grep alike.
+has_spinner_screen() {
+	local content="${1:-}"
+	local braille=$'\xe2[\xa0-\xa3][\x80-\xbf]'
+	if printf '%s\n' "${content}" \
+		| LC_ALL=C grep -E "^[[:space:]]*(${braille})+[[:space:]]+[A-Za-z]" \
+		| LC_ALL=C grep -qiE '[a-z]ing([^a-z]|$)|thinking|working|loading'; then
+		return 0
+	fi
+	# Claude-style glyph + verb + ellipsis ("✻ Thinking…"); kimi moon phases.
+	local glyphs='·|✱|✲|✳|✴|✵|✶|✷|✸|✹|✺|✻|✼|✽|✾|✿|❀|❁|❂|❃|❇|❈|❉|❊|❋|✢|✣|✤|✥|✦|✧|✨|⊛|⊕|⊙|◉|◎|◍|◔|◑|◕|⬡|⬢|🌕|🌖|🌗|🌘|🌑|🌒|🌓|🌔'
+	printf '%s\n' "${content}" | LC_ALL=C grep -qE "^[[:space:]]*(${glyphs})[[:space:]]+[A-Za-z].*(…|\.\.\.)"
 }
 
 pane_state() {
@@ -220,7 +262,17 @@ pane_state() {
 		printf 'unknown\n'
 		return 0
 	fi
-	if has_working_title "$(pane_title "${pane_id}")" || has_working_screen "$(screen_content "${pane_id}")"; then
+	if has_working_title "$(pane_title "${pane_id}")"; then
+		printf 'working\n'
+		return 0
+	fi
+	local content
+	content="$(screen_content "${pane_id}")"
+	if has_blocked_screen "${content}"; then
+		printf 'idle\n'
+		return 0
+	fi
+	if has_working_screen "${content}" || has_spinner_screen "${content}"; then
 		printf 'working\n'
 	else
 		printf 'idle\n'

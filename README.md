@@ -97,14 +97,26 @@ docker run -it --rm gmux-test vanilla    # vanilla flavor
 
 ### Agent Working Indicator
 
-`tmux-window-status.sh` asks `tmux-agent-detect.sh` whether any pane in a window
-is running Claude, Codex, or opencode and whether that pane is currently
-working. When it is, `tmux-agent-spinner.sh` animates the window tab.
+`tmux-agent-spinner.sh` is a single self-contained daemon with two loops. A
+scanner checks every few seconds whether any pane in a window is running an
+agent that is actively working (live spinner in the pane title, or an
+"esc to interrupt" footer in a Claude/Codex pane) and marks the window busy.
+An animator then spins a braille glyph in the window tab at ~8 fps while any
+window is busy — animation never blocks on detection.
 
-Detection handles direct binaries, common wrapper names, symlinked launchers,
-and runtime launches through `node`, `bun`, Python, or shells. It intentionally
-does not treat helper binaries like `codex-helper` or inert `python -c` commands
-as agent sessions.
+The scanner applies hysteresis: a busy window must look idle for three
+consecutive scans before its spinner stops. That bridges the short gaps
+between tool calls and turn transitions, so the indicator runs continuously
+from task start to finish instead of flickering on and off.
+
+The status bar reads only tmux variables (`@busy`, `@spin`, `@wname`) — no
+shell forks inside format strings.
+
+`tmux-agent-detect.sh` provides the deeper process-tree detection (direct
+binaries, common wrapper names, symlinked launchers, and runtime launches
+through `node`, `bun`, Python, or shells) used by the safe pane refresh. It
+intentionally does not treat helper binaries like `codex-helper` or inert
+`python -c` commands as agent sessions.
 
 ### Live Port Watcher
 
@@ -135,6 +147,19 @@ express as one-line tmux bindings:
 - `resize-cycle.sh`: cycle the active pane through 1/3, 1/2, and 2/3 sizes.
 - `half-zoom.sh`: toggle a vertical half-zoom inside the current column.
 - `tmux-cohort.sh`: save, offload, and restore named groups of sessions.
+
+### Pane Layout Presets
+
+One-keystroke layouts for agentic work, bound on the number row:
+
+- `prefix 8` builds the three-pane work layout from a clean one-pane window:
+  a left column split into editor over terminal, plus a full-height right
+  pane. All panes inherit the current working directory.
+- `prefix 9` weights the layout toward the top-left work pane: the left
+  column gets 2/3 of the width and the top-left pane 2/3 of the height.
+- `prefix (` mirrors that to the right: the right pane column gets 2/3 of
+  the window width.
+- `prefix 0` equalizes everything back to a tiled layout.
 
 ## Flavors
 
@@ -175,6 +200,7 @@ keybindings.
 | **Detach** | `prefix d` | `prefix :detach` | `d` is used for clear screen |
 | **Clock** | `prefix t` | `prefix :clock-mode` | `t` is used for new window |
 | **Display pane numbers** | `prefix q` | - | `q` sends `Ctrl-C` |
+| **Select window by number** | `prefix 0-9` | `prefix 1-7` | `8`, `9`, `(`, `0` are layout presets |
 
 ### gmux additions
 
@@ -190,6 +216,10 @@ keybindings.
 | **Reload config** | `prefix R` | Source `tmux.conf` without restarting |
 | **Rename pane** | `prefix T` | Name the current pane |
 | **Half-zoom** | `prefix V` | Toggle vertical half-zoom for the current pane column |
+| **Work layout preset** | `prefix 8` | Three-pane layout from a clean window (editor / terminal / full-height right) |
+| **Weight top-left pane** | `prefix 9` | Left column 2/3 wide, top-left pane 2/3 tall |
+| **Weight right column** | `prefix (` | Right pane column 2/3 of the window width |
+| **Equalize panes** | `prefix 0` | Reset to tiled layout |
 | **Cycle pane size** | `prefix M-H/J/K/L` | Cycle width or height through 1/3, 1/2, 2/3 |
 | **Split above** | `prefix M--` | Create a pane above the current one |
 | **Full-height split** | `prefix \|` | Vertical split spanning horizontal panes |
