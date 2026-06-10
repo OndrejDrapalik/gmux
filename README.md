@@ -1,14 +1,24 @@
 # gmux
 
-**Ghostty x tmux configuration for agentic coding.**
+**Ghostty x tmux configuration for agentic coding.** Run coding agents, dev
+servers, and shells in one terminal workspace — agent activity in the status
+bar, live port markers, and Cmd shortcuts for tmux. Plain dotfiles and shell
+scripts.
 
-gmux is a tmux and Ghostty configuration for running coding agents, development
-servers, test runners, logs, and shells in one terminal workspace. It adds
-status-bar indicators for active agents and local servers, layout helpers, and
-Ghostty Cmd shortcuts that map to tmux actions.
-
-The repository is dotfiles and shell scripts. Install the tmux files directly,
-copy the optional Ghostty/zsh files if needed, and adjust the bindings locally.
+<p>
+  <a href="https://claude.com/claude-code"><img src="assets/logos/claude.svg" alt="Claude Code"></a>&nbsp;&nbsp;
+  <a href="https://openai.com/codex"><img src="assets/logos/codex.svg" alt="Codex CLI"></a>&nbsp;&nbsp;
+  <a href="https://github.com/google-gemini/gemini-cli"><img src="assets/logos/gemini.svg" alt="Gemini CLI"></a>&nbsp;&nbsp;
+  <a href="https://opencode.ai"><img src="assets/logos/opencode.svg" alt="opencode"></a>&nbsp;&nbsp;
+  <a href="https://cursor.com"><img src="assets/logos/cursor.svg" alt="Cursor Agent"></a>&nbsp;&nbsp;
+  <a href="https://github.com/features/copilot/cli"><img src="assets/logos/copilot.svg" alt="Copilot CLI"></a>&nbsp;&nbsp;
+  <a href="https://ampcode.com"><img src="assets/logos/amp.svg" alt="Amp"></a>&nbsp;&nbsp;
+  <a href="https://factory.ai"><img src="assets/logos/droid.svg" alt="Droid"></a>&nbsp;&nbsp;
+  <a href="https://x.ai"><img src="assets/logos/grok.svg" alt="Grok CLI"></a>&nbsp;&nbsp;
+  <a href="https://kiro.dev"><img src="assets/logos/kiro.svg" alt="Kiro"></a>&nbsp;&nbsp;
+  <a href="https://github.com/MoonshotAI/kimi-cli"><img src="assets/logos/kimi.svg" alt="Kimi CLI"></a>&nbsp;&nbsp;
+  <a href="https://cline.bot"><img src="assets/logos/cline.svg" alt="Cline"></a>
+</p>
 
 <img src="assets/hero-demo.gif" alt="gmux demo" width="100%">
 
