@@ -275,9 +275,14 @@ pane_state() {
 	# Only the bottom rows: status chrome (spinners, interrupt footers,
 	# permission dialogs) is bottom-anchored in every harness TUI, while the
 	# transcript above can quote the same strings (e.g. editing this script
-	# inside an agent) and must not read as busy.
+	# inside an agent) and must not read as busy. Trailing blank rows are
+	# trimmed first: cursor-agent top-anchors its UI until the transcript
+	# fills the pane, so a literal bottom-15 window would see only blanks.
 	local content
-	content="$(screen_content "${pane_id}" | tail -n 15)"
+	content="$(screen_content "${pane_id}" | awk '
+		{ lines[NR] = $0; if (NF) last = NR }
+		END { for (i = (last > 15 ? last - 14 : 1); i <= last; i++) print lines[i] }
+	')"
 	if has_blocked_screen "${content}"; then
 		printf 'idle\n'
 		return 0
