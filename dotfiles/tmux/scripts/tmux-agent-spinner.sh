@@ -8,6 +8,24 @@
 set -u
 
 PIDFILE="/tmp/tmux-agent-spinner.pid"
+LOCKDIR="/tmp/tmux-agent-spinner.lock"
+
+# Serializes start/stop so overlapping restarts (tmux.conf run-shell -b can
+# fire several at once) can't interleave pkill/spawn and double-spawn.
+# Lock held >5s is presumed stale (holder crashed) and stolen.
+acquire_lock() {
+	local tries=0
+	until mkdir "${LOCKDIR}" 2>/dev/null; do
+		tries=$(( tries + 1 ))
+		if [ "${tries}" -ge 50 ]; then
+			rm -rf "${LOCKDIR}"
+			tries=0
+			continue
+		fi
+		sleep 0.1
+	done
+	trap 'rm -rf "${LOCKDIR}"' EXIT
+}
 
 is_running() {
 	[ -f "${PIDFILE}" ] || return 1
@@ -205,9 +223,16 @@ update_window_state() {
 
 scan_loop() {
 	PS_TABLE="$(mktemp)"
-	trap 'rm -f "${PS_TABLE}"' EXIT TERM INT
+	# TERM/INT must exit explicitly — a bare cleanup trap swallows the
+	# signal and the loop keeps running, making the scanner unkillable.
+	trap 'rm -f "${PS_TABLE}"' EXIT
+	trap 'exit 0' TERM INT
 	while true; do
 		if ! tmux has-session 2>/dev/null; then
+			exit 0
+		fi
+		# Orphan self-check: parent __loop gone means this scanner leaked.
+		if [ "$(ps -o ppid= -p $$ 2>/dev/null | tr -d '[:space:]')" = "1" ]; then
 			exit 0
 		fi
 		if [ -z "$(tmux list-clients -F x 2>/dev/null)" ]; then
@@ -221,14 +246,22 @@ scan_loop() {
 }
 
 loop() {
-	local scan_pid i ch busy last
+	local scan_pid="" waiter_pid="" i ch busy last
+	# Trap before fork: a signal landing between spawn and trap install
+	# would otherwise orphan the scanner.
+	trap 'kill "${scan_pid}" "${waiter_pid}" 2>/dev/null; exit 0' EXIT TERM INT
 	"$0" __scan &
 	scan_pid=$!
-	trap 'kill "${scan_pid}" 2>/dev/null; exit 0' EXIT TERM INT
 
 	i=0
 	last=""
 	while true; do
+		# Singleton invariant: the pidfile names the one legitimate loop.
+		# A loop that lost ownership (newer start ran) exits, taking its
+		# scanner with it via the trap.
+		if [ "$(cat "${PIDFILE}" 2>/dev/null)" != "$$" ]; then
+			exit 0
+		fi
 		busy="$(tmux show -gqv @busy_any 2>/dev/null)" || {
 			tmux has-session 2>/dev/null || exit 0
 			sleep 2
@@ -241,9 +274,14 @@ loop() {
 				last=""
 			fi
 			# Block until the scanner signals idle→busy: zero CPU while idle,
-			# instant spin-up. Errors (server gone) fall through to the
-			# has-session check at the top of the loop.
-			tmux wait-for gmux-spinner-wake 2>/dev/null || sleep 2
+			# instant spin-up. Run the blocking client in the background and
+			# `wait` on it — bash defers signal traps while a foreground
+			# command runs, so a foreground wait-for would make this loop
+			# unkillable by TERM for as long as it stays idle.
+			tmux wait-for gmux-spinner-wake 2>/dev/null &
+			waiter_pid=$!
+			wait "${waiter_pid}" || sleep 2
+			waiter_pid=""
 			continue
 		fi
 
@@ -273,20 +311,37 @@ case "${1:-start}" in
 		update_window_state
 		;;
 	start)
+		acquire_lock
 		if is_running; then
 			exit 0
 		fi
 		rm -f "${PIDFILE}"
 		pkill -f 'tmux-agent-spinner.sh __' 2>/dev/null || true
 		clear_spin
-		nohup "$0" __loop >/dev/null 2>&1 &
-		echo "$!" > "${PIDFILE}"
+		# Child writes its own pid before exec'ing into __loop, so the
+		# pidfile is guaranteed populated before the loop's singleton
+		# check ever runs. The trailing comment token keeps the pre-exec
+		# cmdline matchable by stop's pkill pattern — without it a child
+		# caught mid-spawn is invisible to pkill and leaks.
+		nohup bash -c 'echo "$$" >"$1"; exec "$0" __loop # tmux-agent-spinner.sh __spawn' "$0" "${PIDFILE}" >/dev/null 2>&1 &
+		# Hold the lock until the child has exec'd (pidfile holds a live
+		# pid whose cmdline matches __loop) so a following stop sees it.
+		for _ in 1 2 3 4 5 6 7 8 9 10; do
+			is_running && break
+			sleep 0.1
+		done
 		;;
 	stop)
+		acquire_lock
 		if is_running; then
 			kill "$(cat "${PIDFILE}")" 2>/dev/null || true
 		fi
 		pkill -f 'tmux-agent-spinner.sh __' 2>/dev/null || true
+		# Wake any loop parked in wait-for so its TERM trap can fire,
+		# then escalate to KILL for whatever still ignores TERM.
+		tmux wait-for -S gmux-spinner-wake 2>/dev/null || true
+		sleep 0.3
+		pkill -9 -f 'tmux-agent-spinner.sh __' 2>/dev/null || true
 		rm -f "${PIDFILE}"
 		;;
 	restart)
