@@ -17,7 +17,7 @@ basename_token() {
 agent_from_basename() {
 	case "$(basename_token "${1:-}" | tr '[:upper:]' '[:lower:]')" in
 		.claude-code-wrapped | claude | claude-code) printf 'claude' ;;
-		.codex-wrapped | codex) printf 'codex' ;;
+		.codex-wrapped | codex | codex-aarch64-* | codex-x86_64-*) printf 'codex' ;;
 		.opencode-wrapped | opencode | open-code) printf 'opencode' ;;
 		.gemini-wrapped | gemini) printf 'gemini' ;;
 		.cursor-agent-wrapped | cursor-agent) printf 'cursor' ;;
@@ -239,6 +239,16 @@ has_working_screen() {
 	printf '%s' "${lower}" | LC_ALL=C grep -Eq 'esc to interrupt|ctrl\+c to interrupt|esc.*interrupt|esc to cancel|ctrl\+c to stop|esc to stop|esc again to cancel|ctrl\+c cancel|kiro is working|• working \('
 }
 
+has_idle_prompt_screen() {
+	local lower
+	lower="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+	if printf '%s\n' "${1:-}" | grep -qE '^[[:space:]]*❯[[:space:]]*$'; then
+		! printf '%s' "${lower}" | LC_ALL=C grep -Eq 'esc to interrupt|ctrl\+c to interrupt|esc.*interrupt|ctrl\+c to stop|ctrl\+c cancel|• working \('
+		return
+	fi
+	return 1
+}
+
 # Spinner glyph at line start followed by an activity word. Braille frames
 # (opencode/cursor/droid/grok) are matched as UTF-8 bytes (U+2800-U+28FF)
 # under LC_ALL=C so every frame works on BSD and GNU grep alike.
@@ -258,12 +268,8 @@ has_spinner_screen() {
 pane_state() {
 	local pane_id="$1"
 	local pane_pid="$2"
-	if ! pane_agent "${pane_pid}" >/dev/null; then
+	if [ "${GMUX_AGENT_ASSUME_PANE_AGENT:-0}" != "1" ] && ! pane_agent "${pane_pid}" >/dev/null; then
 		printf 'unknown\n'
-		return 0
-	fi
-	if has_working_title "$(pane_title "${pane_id}")"; then
-		printf 'working\n'
 		return 0
 	fi
 	# Only the bottom rows: status chrome (spinners, interrupt footers,
@@ -273,6 +279,21 @@ pane_state() {
 	local content
 	content="$(screen_content "${pane_id}" | tail -n 15)"
 	if has_blocked_screen "${content}"; then
+		printf 'idle\n'
+		return 0
+	fi
+	# Live OSC title is the only signal that separates a working harness from
+	# its own finished transcript — Claude Code repaints the braille glyph
+	# every frame and swaps it out the moment the turn ends. Screen shape
+	# alone cannot tell "✽ Vibing… (2m)" (live) from "✻ Building… (5m)"
+	# (stale text above an idle prompt). Stale titles from dead processes are
+	# handled upstream: the scanner drops windows with no agent process
+	# immediately.
+	if has_working_title "$(pane_title "${pane_id}")"; then
+		printf 'working\n'
+		return 0
+	fi
+	if has_idle_prompt_screen "${content}"; then
 		printf 'idle\n'
 		return 0
 	fi
