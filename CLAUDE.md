@@ -24,11 +24,10 @@ gmux/
 │   │       ├── resize-cycle.sh       # 1/3, 1/2, 2/3 pane size cycling
 │   │       ├── session-padding.sh    # Session name padding
 │   │       ├── swap-pane-follow.sh   # Directional swap with focus follow
-│   │       ├── tmux-agent-detect.sh  # Agent process/state detection
-│   │       ├── tmux-agent-spinner.sh # Agent working spinner
+│   │       ├── tmux-agent-detect.sh  # Agent process/state detection (used by refresh-panes)
+│   │       ├── tmux-agent-spinner.sh # Agent busy detection + working spinner daemon
 │   │       ├── tmux-cohort.sh        # Save/offload/restore session groups
-│   │       ├── tmux-live-port-watcher.sh  # Dev server port detection
-│   │       └── tmux-window-status.sh # Window status formatting
+│   │       └── tmux-live-port-watcher.sh  # Dev server port detection
 │   ├── tmux.conf                 # Entry point (sources base + flavor)
 │   └── zshrc                     # Zsh config (omz + aliases)
 ├── Dockerfile                    # Sandboxed test environment
