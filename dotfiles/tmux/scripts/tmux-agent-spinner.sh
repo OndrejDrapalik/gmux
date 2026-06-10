@@ -30,42 +30,55 @@ MISS_LIMIT=3
 
 TITLE_BUSY_RE='^([⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠂⠒⠢⠆⠐⠠⠄◐◓◑◒|/\-] )'
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" >/dev/null && pwd)"
+AGENT_DETECT="${GMUX_AGENT_DETECT:-${SCRIPT_DIR}/tmux-agent-detect.sh}"
+
 clear_spin() {
 	tmux set -gqu @spin \; refresh-client -S 2>/dev/null || true
 }
 
 pane_is_busy() {
-	local pane_id="$1" pane_cmd="$2" pane_title="$3" pane_tty="$4"
+	local pane_id="$1" pane_pid="$2" pane_title="$3"
 
-	# Cheapest check first: live spinner prefix in the pane title.
+	# Cheapest check first: live spinner prefix in the pane title. Also covers
+	# remote agents (ssh) whose title arrives via OSC with no local process.
 	if printf "%s" "${pane_title}" | grep -qE "${TITLE_BUSY_RE}"; then
 		return 0
 	fi
 
-	# Only agent panes warrant a capture-pane.
-	case "${pane_cmd}" in
-		*claude* | *codex* | [0-9]*.[0-9]*.[0-9]*) ;;
-		*)
-			ps -t "${pane_tty##*/}" -o command= 2>/dev/null | grep -qiE '(^|/)(claude|codex)( |$|-)' || return 1
-			;;
-	esac
-
-	# Visible pane only — scrollback can hold a stale marker.
-	tmux capture-pane -p -J -t "${pane_id}" 2>/dev/null | grep -q 'esc to interrupt'
+	# Full per-harness detection (process tree + screen chrome) lives in the
+	# detector; the caller shares one ps snapshot per scan via
+	# GMUX_AGENT_PROCESS_TABLE so this stays one capture-pane per agent pane.
+	[ -x "${AGENT_DETECT}" ] || return 1
+	[ "$(GMUX_AGENT_PANE_TITLE="${pane_title}" "${AGENT_DETECT}" pane-state "${pane_id}" "${pane_pid}" 2>/dev/null)" = "working" ]
 }
 
 update_window_state() {
-	local window_id window_name pane_id pane_cmd pane_title pane_tty
+	local window_id window_name pane_id pane_pid pane_title
 	local busy_now prev_busy prev_miss miss any_busy
 	local busy_windows=" "
 	local -a batch=()
 
-	while IFS=$'\t' read -r window_id pane_id pane_cmd pane_title pane_tty; do
+	# One ps snapshot per scan, shared by every detector call below.
+	local ps_table
+	ps_table="$(mktemp)"
+	ps -axo pid=,ppid=,pgid=,tpgid=,comm=,args= 2>/dev/null | awk '{
+		pid=$1; ppid=$2; pgid=$3; tpgid=$4; comm=$5;
+		$1=$2=$3=$4=$5="";
+		sub(/^[[:space:]]+/, "", $0);
+		printf "%s\t%s\t%s\t%s\t%s\t%s\n", pid, ppid, pgid, tpgid, comm, $0
+	}' >"${ps_table}"
+	export GMUX_AGENT_PROCESS_TABLE="${ps_table}"
+
+	while IFS=$'\t' read -r window_id pane_id pane_pid pane_title; do
 		case "${busy_windows}" in *" ${window_id} "*) continue ;; esac
-		if pane_is_busy "${pane_id}" "${pane_cmd}" "${pane_title}" "${pane_tty}"; then
+		if pane_is_busy "${pane_id}" "${pane_pid}" "${pane_title}"; then
 			busy_windows="${busy_windows}${window_id} "
 		fi
-	done < <(tmux list-panes -a -F '#{window_id}	#{pane_id}	#{pane_current_command}	#{pane_title}	#{pane_tty}' 2>/dev/null || true)
+	done < <(tmux list-panes -a -F '#{window_id}	#{pane_id}	#{pane_pid}	#{pane_title}' 2>/dev/null || true)
+
+	unset GMUX_AGENT_PROCESS_TABLE
+	rm -f "${ps_table}"
 
 	any_busy=0
 	while IFS=$'\t' read -r window_id window_name prev_busy prev_miss; do
