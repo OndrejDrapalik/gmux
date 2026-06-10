@@ -61,6 +61,16 @@ printf 'idle screen\n' >"${screen}"
 state="$(GMUX_AGENT_PROCESS_TABLE="${fixture}" GMUX_AGENT_SCREEN_FILE="${screen}" GMUX_AGENT_PANE_TITLE="◐ Thinking" "${DETECTOR}" pane-state "%1" 100)"
 [ "${state}" = "working" ] || fail "expected title working state, got ${state}"
 
+# Live spinner titles are trusted in assume mode too — modern Claude Code
+# shows no interrupt footer and always renders the ❯ input box, so the OSC
+# title is the only signal that separates working from a finished transcript.
+# Stale titles from dead processes are dropped by the scanner, not here.
+state="$(GMUX_AGENT_PROCESS_TABLE="${fixture}" GMUX_AGENT_SCREEN_FILE="${screen}" GMUX_AGENT_ASSUME_PANE_AGENT=1 GMUX_AGENT_PANE_TITLE="◐ Thinking" "${DETECTOR}" pane-state "%1" 100)"
+[ "${state}" = "working" ] || fail "expected assumed local agent to trust live title, got ${state}"
+
+state="$(GMUX_AGENT_PROCESS_TABLE="${fixture}" GMUX_AGENT_SCREEN_FILE="${screen}" GMUX_AGENT_ASSUME_PANE_AGENT=1 GMUX_AGENT_PANE_TITLE="✳ Done Task" "${DETECTOR}" pane-state "%1" 100)"
+[ "${state}" = "idle" ] || fail "expected assumed local agent with idle title to be idle, got ${state}"
+
 state="$(GMUX_AGENT_PROCESS_TABLE="${fixture}" GMUX_AGENT_SCREEN_FILE="${screen}" GMUX_AGENT_PANE_TITLE="Task Name" "${DETECTOR}" pane-state "%1" 100)"
 [ "${state}" = "idle" ] || fail "expected idle state, got ${state}"
 
@@ -111,7 +121,22 @@ assert_state() {
 assert_state working claude "claude" "✻ Cogitating… (2s · 1.2k tokens)"
 assert_state working claude "claude" "running tests
 esc to interrupt"
+assert_state idle claude "claude" "✻ Building Convex sandbox action… (running stop hooks… 4/6 · 5m 59s)
+────────────────
+❯
+────────────────"
 assert_state idle claude "claude" "❯ "
+# Live working pane in modern Claude Code: no interrupt footer, ❯ box always
+# rendered — only the braille OSC title says it is working.
+assert_state working claude "claude" "✽ Vibing… (2m 7s · ↓ 5.5k tokens)
+────────────────
+❯
+────────────────" "⠐ Update fake terminal content"
+# Same screen, idle title: turn is over even though the spinner line lingers.
+assert_state idle claude "claude" "✽ Vibing… (2m 7s · ↓ 5.5k tokens)
+────────────────
+❯
+────────────────" "✳ Update fake terminal content"
 assert_state idle claude "claude" "Do you want to proceed?
 ❯ 1. Yes
   2. No"
