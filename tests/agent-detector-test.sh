@@ -115,18 +115,32 @@ assert_state idle claude "claude" "❯ "
 assert_state idle claude "claude" "Do you want to proceed?
 ❯ 1. Yes
   2. No"
+assert_state idle claude "claude" "Which option?
+❯ 1. /docs route, render README
+Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel"
 
 # codex: working header, confirm dialog stays idle
 assert_state working codex "codex" "• Working (8s • esc to interrupt)"
 assert_state idle codex "codex" "press enter to confirm or esc to cancel"
 assert_state idle codex "codex" "› "
 
-# opencode: braille spinner in screen content
+# opencode: braille spinner in screen content, dotted footer ("esc interrupt", no "to")
 assert_state working opencode "opencode run" "⠹ working"
+assert_state working opencode "opencode run" "·········· esc interrupt"
 assert_state working opencode "opencode run" "⠧ Generating response"
 assert_state idle opencode "opencode run" "> "
 assert_state idle opencode "opencode run" "△ Permission required
 esc dismiss  enter confirm  ↑↓ select"
+
+# Transcript quoting busy chrome (working on the spinner itself inside an
+# agent) must not read as busy — only the bottom rows count.
+transcript_quote="$(printf 'discussing the gmux spinner:\nthe footer says esc to interrupt when busy\nframes are ⠹ working glyphs\n%.0s\n' 1)
+$(printf '~\n%.0s' 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+> "
+assert_state idle opencode "opencode run" "${transcript_quote}"
+assert_state working opencode "opencode run" "old chat line
+$(printf '~\n%.0s' 1 2 3 4 5 6 7 8 9 10)
+·········· esc interrupt"
 
 # gemini
 assert_state working gemini "gemini" "esc to cancel"

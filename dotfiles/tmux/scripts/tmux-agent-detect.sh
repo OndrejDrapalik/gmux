@@ -224,7 +224,7 @@ has_working_title() {
 has_blocked_screen() {
 	local lower
 	lower="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
-	if printf '%s' "${lower}" | LC_ALL=C grep -qE 'press enter to confirm or esc to cancel|waiting for permission|waiting for approval|waiting for user confirmation|permission required|requesting approval|requires approval|let cline use this tool'; then
+	if printf '%s' "${lower}" | LC_ALL=C grep -qE 'press enter to confirm or esc to cancel|enter to select|waiting for permission|waiting for approval|waiting for user confirmation|permission required|requesting approval|requires approval|let cline use this tool'; then
 		return 0
 	fi
 	if printf '%s' "${lower}" | LC_ALL=C grep -qE 'do you want to proceed|would you like to proceed'; then
@@ -266,8 +266,12 @@ pane_state() {
 		printf 'working\n'
 		return 0
 	fi
+	# Only the bottom rows: status chrome (spinners, interrupt footers,
+	# permission dialogs) is bottom-anchored in every harness TUI, while the
+	# transcript above can quote the same strings (e.g. editing this script
+	# inside an agent) and must not read as busy.
 	local content
-	content="$(screen_content "${pane_id}")"
+	content="$(screen_content "${pane_id}" | tail -n 15)"
 	if has_blocked_screen "${content}"; then
 		printf 'idle\n'
 		return 0
