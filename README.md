@@ -38,6 +38,8 @@ scripts.
   scripts and keybindings.
 - **Template picker**: apply reusable window/pane layouts to the current
   directory from an fzf popup, with a live ASCII preview before launch.
+- **Focus Mode**: show the current pane in a large temporary popup without
+  permanently changing the window layout.
 - **Two keybinding modes**: use the opinionated gmux flavor, or keep stock tmux
   bindings with the same status bar and observability layer.
 
@@ -170,6 +172,8 @@ express as one-line tmux bindings:
 - `tmux-cohort.sh`: save, offload, and restore named groups of sessions.
 - `gmux-template-picker.sh`: pick a reusable layout and apply it to the
   current directory as a new tmux session.
+- `focus-mode.sh`: open the active pane in a popup tmux client and restore the
+  previous zoom state when the popup closes.
 
 ### Pane Layout Presets
 
@@ -235,6 +239,16 @@ any tmux `layout` accepted by `select-layout`:
 }
 ```
 
+### Focus Mode
+
+`prefix F` opens the active pane inside a large popup. It creates a temporary
+grouped tmux session, selects the same window and pane, zooms that pane for the
+popup client, and restores the previous zoom state when the popup exits.
+
+Use it when a pane deserves temporary full attention but you do not want to
+permanently rearrange the window layout. Close the popup by detaching the popup
+client or closing the popup.
+
 ## Flavors
 
 Both flavors share the Tokyo Night status bar, agent indicators, port watcher,
@@ -289,6 +303,7 @@ keybindings.
 | **Refresh panes** | `prefix r` | Skips running agents and dev servers |
 | **Reload config** | `prefix R` | Source `tmux.conf` without restarting |
 | **Rename pane** | `prefix T` | Name the current pane |
+| **Focus Mode** | `prefix F` | Show the current pane in a large temporary popup |
 | **Template picker** | `prefix G` | Apply a reusable layout to the current directory |
 | **Half-zoom** | `prefix V` | Toggle vertical half-zoom for the current pane column |
 | **Work layout preset** | `prefix 8` | Three-pane layout from a clean window (editor / terminal / full-height right) |
