@@ -36,6 +36,8 @@ scripts.
 - **Pane layout helpers**: recursive split, clockwise pane cycling, directional
   pane swaps with focus follow, half-zoom, and size cycling are available as
   scripts and keybindings.
+- **Template picker**: apply reusable window/pane layouts to the current
+  directory from an fzf popup, with a live ASCII preview before launch.
 - **Two keybinding modes**: use the opinionated gmux flavor, or keep stock tmux
   bindings with the same status bar and observability layer.
 
@@ -59,6 +61,14 @@ ln -sf "$(pwd)/dotfiles/tmux/keys-vanilla.conf" ~/.tmux/keys-vanilla.conf
 rm -rf ~/.tmux/scripts
 cp -R dotfiles/tmux/scripts ~/.tmux/scripts
 chmod +x ~/.tmux/scripts/*.sh
+```
+
+Optional template picker dependencies and examples:
+
+```sh
+brew install fzf jq
+mkdir -p ~/.config/gmux/templates
+cp dotfiles/config/gmux/templates/*.json ~/.config/gmux/templates/
 ```
 
 Optional Ghostty and zsh files:
@@ -94,6 +104,7 @@ docker run -it --rm gmux-test vanilla    # vanilla flavor
 | Layer | File | Purpose |
 | --- | --- | --- |
 | Ghostty | `dotfiles/config/ghostty/config` | Cmd-key to tmux Meta passthrough, Tokyo Night theme, background blur |
+| gmux templates | `dotfiles/config/gmux/templates/` | Example reusable workspace layouts for the template picker |
 | tmux | `dotfiles/tmux.conf` | Entry point that sources the shared base and selected keybinding flavor |
 | tmux | `dotfiles/tmux/base.conf` | Shared theme, status bar, hooks, plugins, port watcher, agent spinner |
 | tmux | `dotfiles/tmux/keys-gmux.conf` | Opinionated `C-Space` keybinding flavor |
@@ -157,6 +168,8 @@ express as one-line tmux bindings:
 - `resize-cycle.sh`: cycle the active pane through 1/3, 1/2, and 2/3 sizes.
 - `half-zoom.sh`: toggle a vertical half-zoom inside the current column.
 - `tmux-cohort.sh`: save, offload, and restore named groups of sessions.
+- `gmux-template-picker.sh`: pick a reusable layout and apply it to the
+  current directory as a new tmux session.
 
 ### Pane Layout Presets
 
@@ -170,6 +183,57 @@ One-keystroke layouts for agentic work, bound on the number row:
 - `prefix (` mirrors that to the right: the right pane column gets 2/3 of
   the window width.
 - `prefix 0` equalizes everything back to a tiled layout.
+
+### Template Picker
+
+`prefix G` opens an fzf popup that lists templates from
+`~/.config/gmux/templates/*.json`. The left side shows human-readable names and
+descriptions; the right side previews the selected template as ASCII windows
+and panes.
+
+Templates apply to the active pane's current directory. After selection, gmux
+prompts for a session name with a path-derived default:
+
+- repo root: `repo-name`
+- repo subdirectory: `repo-name-sub-path`
+- non-git directory: slugified path
+
+If that session already exists, gmux switches to it instead of recreating it.
+
+Example:
+
+```json
+{
+  "name": "Agent + Git + Shell",
+  "description": "Codex, lazygit, and a spare shell rooted at the current directory",
+  "windows": [
+    { "name": "codex", "command": "codex" },
+    { "name": "git", "command": "lazygit" },
+    { "name": "shell" }
+  ]
+}
+```
+
+Pane templates can specify `split` as `right` or `down`, optional `size`, and
+any tmux `layout` accepted by `select-layout`:
+
+```json
+{
+  "name": "Dev Split",
+  "description": "One window with shell, git status, and test panes",
+  "windows": [
+    {
+      "name": "dev",
+      "layout": "tiled",
+      "panes": [
+        { "command": "pwd" },
+        { "split": "right", "command": "git status --short" },
+        { "split": "down", "command": "test -f package.json && npm test || true" }
+      ]
+    }
+  ]
+}
+```
 
 ## Flavors
 
@@ -225,6 +289,7 @@ keybindings.
 | **Refresh panes** | `prefix r` | Skips running agents and dev servers |
 | **Reload config** | `prefix R` | Source `tmux.conf` without restarting |
 | **Rename pane** | `prefix T` | Name the current pane |
+| **Template picker** | `prefix G` | Apply a reusable layout to the current directory |
 | **Half-zoom** | `prefix V` | Toggle vertical half-zoom for the current pane column |
 | **Work layout preset** | `prefix 8` | Three-pane layout from a clean window (editor / terminal / full-height right) |
 | **Weight top-left pane** | `prefix 9` | Left column 2/3 wide, top-left pane 2/3 tall |

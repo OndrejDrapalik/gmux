@@ -8,6 +8,7 @@ Ghostty + tmux terminal layer for agentic coding.
 gmux/
 ├── dotfiles/
 │   ├── config/
+│   │   ├── gmux/templates/       # Example layout templates for the tmux picker
 │   │   ├── ghostty/config        # Ghostty terminal config (keybinds, theme, blur)
 │   │   └── zsh/fzf-tab-config.zsh  # fzf-tab completion styling
 │   ├── tmux/
@@ -20,6 +21,7 @@ gmux/
 │   │       ├── pane-border.sh        # Optional pane border formatter
 │   │       ├── pane-cycle-clockwise.sh # Spatial pane cycling
 │   │       ├── recursive-split.sh    # Aspect-ratio based pane splitting
+│   │       ├── gmux-template-picker.sh # fzf template picker for reusable layouts
 │   │       ├── refresh-panes.sh      # Pane refresh utility
 │   │       ├── resize-cycle.sh       # 1/3, 1/2, 2/3 pane size cycling
 │   │       ├── session-padding.sh    # Session name padding

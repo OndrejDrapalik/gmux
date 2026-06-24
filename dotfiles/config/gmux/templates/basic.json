@@ -1,0 +1,9 @@
+{
+  "name": "Basic",
+  "description": "One shell window in the current directory",
+  "windows": [
+    {
+      "name": "shell"
+    }
+  ]
+}
