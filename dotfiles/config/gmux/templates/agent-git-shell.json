@@ -1,0 +1,17 @@
+{
+  "name": "Agent + Git + Shell",
+  "description": "Codex, lazygit, and a spare shell rooted at the current directory",
+  "windows": [
+    {
+      "name": "codex",
+      "command": "codex"
+    },
+    {
+      "name": "git",
+      "command": "lazygit"
+    },
+    {
+      "name": "shell"
+    }
+  ]
+}
