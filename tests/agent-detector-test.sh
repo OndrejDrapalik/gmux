@@ -137,16 +137,16 @@ assert_state idle claude "claude" "✽ Vibing… (2m 7s · ↓ 5.5k tokens)
 ────────────────
 ❯
 ────────────────" "✳ Update fake terminal content"
-assert_state idle claude "claude" "Do you want to proceed?
+assert_state blocked claude "claude" "Do you want to proceed?
 ❯ 1. Yes
   2. No"
-assert_state idle claude "claude" "Which option?
+assert_state blocked claude "claude" "Which option?
 ❯ 1. /docs route, render README
 Enter to select · ↑/↓ to navigate · n to add notes · Esc to cancel"
 
-# codex: working header, confirm dialog stays idle
+# codex: working header, confirm dialog is blocked
 assert_state working codex "codex" "• Working (8s • esc to interrupt)"
-assert_state idle codex "codex" "press enter to confirm or esc to cancel"
+assert_state blocked codex "codex" "press enter to confirm or esc to cancel"
 assert_state idle codex "codex" "› "
 
 # opencode: braille spinner in screen content, dotted footer ("esc interrupt", no "to")
@@ -154,7 +154,7 @@ assert_state working opencode "opencode run" "⠹ working"
 assert_state working opencode "opencode run" "·········· esc interrupt"
 assert_state working opencode "opencode run" "⠧ Generating response"
 assert_state idle opencode "opencode run" "> "
-assert_state idle opencode "opencode run" "△ Permission required
+assert_state blocked opencode "opencode run" "△ Permission required
 esc dismiss  enter confirm  ↑↓ select"
 
 # Transcript quoting busy chrome (working on the spinner itself inside an
@@ -170,7 +170,7 @@ $(printf '~\n%.0s' 1 2 3 4 5 6 7 8 9 10)
 # gemini
 assert_state working gemini "gemini" "esc to cancel"
 assert_state idle gemini "gemini" "Type your message"
-assert_state idle gemini "gemini" "Waiting for user confirmation
+assert_state blocked gemini "gemini" "Waiting for user confirmation
 esc to cancel"
 
 # droid
@@ -180,7 +180,7 @@ assert_state idle droid "droid" "ready"
 
 # kiro
 assert_state working kiro-cli "kiro-cli" "Kiro is working"
-assert_state idle kiro-cli "kiro-cli" "requires approval
+assert_state blocked kiro-cli "kiro-cli" "requires approval
 yes, single permission"
 
 # kimi: moon phase spinner
@@ -194,7 +194,7 @@ assert_state idle cursor-agent "cursor-agent" "Add a follow-up"
 
 # amp / copilot
 assert_state working amp "amp" "esc to cancel"
-assert_state idle amp "amp" "waiting for approval
+assert_state blocked amp "amp" "waiting for approval
 approve  deny with feedback"
 assert_state working copilot "copilot" "esc again to cancel"
 assert_state idle copilot "copilot" "ctrl+c to quit"

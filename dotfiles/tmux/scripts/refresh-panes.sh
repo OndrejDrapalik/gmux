@@ -50,9 +50,8 @@ for entry in $(tmux list-panes -F '#{pane_id}:#{pane_pid}'); do
     *" $id "*) continue ;;
   esac
 
-  # Skip panes running an agent harness, including wrapped or nested launches.
-  detector="${GMUX_AGENT_DETECT:-${HOME}/.tmux/scripts/tmux-agent-detect.sh}"
-  if "$detector" pane-agent "$pid" >/dev/null 2>&1; then
+  # Skip panes running claude, codex, or opencode
+  if pgrep -P "$pid" "claude|codex|opencode" >/dev/null 2>&1; then
     continue
   fi
 

@@ -1,0 +1,23 @@
+{
+  "name": "Dev Split",
+  "description": "One window with shell, git status, and test panes",
+  "windows": [
+    {
+      "name": "dev",
+      "layout": "tiled",
+      "panes": [
+        {
+          "command": "pwd"
+        },
+        {
+          "split": "right",
+          "command": "git status --short"
+        },
+        {
+          "split": "down",
+          "command": "test -f package.json && npm test || true"
+        }
+      ]
+    }
+  ]
+}

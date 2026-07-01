@@ -124,6 +124,79 @@ agent_pane_ids() {
 		' - "${ps_table}" | sort -u
 }
 
+# Per-pane agent state cache, read by the session navigator (prefix+a).
+# Mirrors herdr's model: the detector emits working/idle/blocked/unknown and
+# "done" is derived here as idle reached while the pane's window was off screen
+# (idle + unseen). Publishes three per-pane options the navigator reads with
+# zero forks: @pane_agent, @pane_state (effective 5-state), @pane_seen (0/1).
+# Reuses the scan's shared ps snapshot (GMUX_AGENT_PROCESS_TABLE) and is purely
+# additive — it never touches the @busy spinner logic above.
+update_pane_states() {
+	local agent_panes="$1"
+	local pane_id pane_pid pane_title win_active sess_attached prev_eff prev_seen
+	local info agent base prev_base focused seen eff
+	local -a pbatch=()
+
+	while IFS=$'\t' read -r pane_id pane_pid pane_title win_active sess_attached prev_eff prev_seen; do
+		[ -n "${pane_id}" ] || continue
+		case "${agent_panes}" in
+			*" ${pane_id} "*)
+				info="$(GMUX_AGENT_PANE_TITLE="${pane_title}" "${AGENT_DETECT}" pane-info "${pane_id}" "${pane_pid}" 2>/dev/null)"
+				IFS=$'\t' read -r agent base <<<"${info}"
+				;;
+			*)
+				agent=""
+				base="unknown"
+				;;
+		esac
+		[ -n "${base}" ] || base="unknown"
+
+		# Collapse a previously-derived "done" back to its "idle" base so a
+		# working/blocked -> idle transition stays observable across scans.
+		case "${prev_eff}" in
+			done) prev_base="idle" ;;
+			*) prev_base="${prev_eff}" ;;
+		esac
+		[ -n "${prev_seen}" ] || prev_seen=1
+
+		if [ "${win_active}" = "1" ] && [ "${sess_attached}" = "1" ]; then
+			focused=1
+		else
+			focused=0
+		fi
+
+		# seen=1 whenever on screen or active; flips to 0 only on the
+		# off-screen finish (working/blocked -> idle while unfocused) == "done".
+		if [ "${base}" = "unknown" ]; then
+			seen=1
+		elif [ "${focused}" = "1" ]; then
+			seen=1
+		elif [ "${base}" != "idle" ]; then
+			seen=1
+		elif [ -n "${prev_base}" ] && [ "${prev_base}" != "idle" ]; then
+			seen=0
+		else
+			seen="${prev_seen}"
+		fi
+
+		if [ "${base}" = "idle" ] && [ "${seen}" = "0" ]; then
+			eff="done"
+		else
+			eff="${base}"
+		fi
+
+		pbatch+=(set-option -pqt "${pane_id}" @pane_agent "${agent}" \;
+			set-option -pqt "${pane_id}" @pane_state "${eff}" \;
+			set-option -pqt "${pane_id}" @pane_seen "${seen}" \;)
+	done < <(tmux list-panes -a -F '#{pane_id}	#{pane_pid}	#{pane_title}	#{window_active}	#{session_attached}	#{@pane_state}	#{@pane_seen}' 2>/dev/null || true)
+
+	if [ "${#pbatch[@]}" -gt 0 ]; then
+		# Drop the trailing separator so tmux does not see an empty final command.
+		unset 'pbatch[${#pbatch[@]}-1]'
+		tmux "${pbatch[@]}" 2>/dev/null || true
+	fi
+}
+
 update_window_state() {
 	local window_id window_name pane_id pane_pid pane_title
 	local busy_now prev_busy prev_miss miss any_busy
@@ -169,6 +242,10 @@ update_window_state() {
 			busy_windows="${busy_windows}${window_id} "
 		fi
 	done < <(tmux list-panes -a -F '#{window_id}	#{pane_id}	#{pane_pid}	#{pane_title}' 2>/dev/null || true)
+
+	# Additive per-pane state cache for the navigator; shares the ps snapshot
+	# still exported here, before it is torn down below.
+	update_pane_states "${agent_panes}"
 
 	unset GMUX_AGENT_PROCESS_TABLE
 	[ "${own_table}" -eq 1 ] && rm -f "${ps_table}"

@@ -6,7 +6,7 @@ ENV COLORTERM=truecolor
 
 # Core packages
 RUN apt-get update && apt-get install -y \
-    tmux zsh git curl wget locales lsof procps fzf \
+    tmux zsh git curl wget locales lsof procps fzf jq \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,6 +36,8 @@ COPY --chown=dev:dev dotfiles/tmux/entrypoint.sh /home/dev/.tmux/entrypoint.sh
 COPY --chown=dev:dev dotfiles/zshrc /home/dev/.zshrc
 COPY --chown=dev:dev dotfiles/tmux/scripts/ /home/dev/.tmux/scripts/
 COPY --chown=dev:dev dotfiles/config/zsh/ /home/dev/.config/zsh/
+COPY --chown=dev:dev dotfiles/config/gmux/templates/ /home/dev/.config/gmux/templates/
+COPY --chown=dev:dev dotfiles/config/tmux-gmux/templates/ /home/dev/.config/tmux-gmux/templates/
 
 # Make scripts executable + install tmux plugins
 RUN chmod +x ~/.tmux/scripts/*.sh ~/.tmux/entrypoint.sh \

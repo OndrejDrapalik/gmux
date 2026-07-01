@@ -275,11 +275,16 @@ pane_state() {
 	# Only the bottom rows: status chrome (spinners, interrupt footers,
 	# permission dialogs) is bottom-anchored in every harness TUI, while the
 	# transcript above can quote the same strings (e.g. editing this script
-	# inside an agent) and must not read as busy.
+	# inside an agent) and must not read as busy. Trailing blank rows are
+	# trimmed first: cursor-agent top-anchors its UI until the transcript
+	# fills the pane, so a literal bottom-15 window would see only blanks.
 	local content
-	content="$(screen_content "${pane_id}" | tail -n 15)"
+	content="$(screen_content "${pane_id}" | awk '
+		{ lines[NR] = $0; if (NF) last = NR }
+		END { for (i = (last > 15 ? last - 14 : 1); i <= last; i++) print lines[i] }
+	')"
 	if has_blocked_screen "${content}"; then
-		printf 'idle\n'
+		printf 'blocked\n'
 		return 0
 	fi
 	# Live OSC title is the only signal that separates a working harness from
@@ -304,6 +309,22 @@ pane_state() {
 	fi
 }
 
+# Agent name + state in one pass: one process-tree walk (pane_agent) feeds the
+# screen classification (pane_state with the agent assumed) so callers caching
+# both per pane pay a single capture-pane instead of two. Prints "<agent>\t<state>"
+# (agent empty for a plain shell). State is one of working/idle/blocked/unknown;
+# "done" is not a detected state — it is derived (idle + unseen) by the caller.
+pane_info() {
+	local pane_id="$1" pane_pid="$2" agent state
+	if agent="$(pane_agent "${pane_pid}" 2>/dev/null)"; then
+		state="$(GMUX_AGENT_ASSUME_PANE_AGENT=1 pane_state "${pane_id}" "${pane_pid}")"
+	else
+		agent=""
+		state="unknown"
+	fi
+	printf '%s\t%s\n' "${agent}" "${state}"
+}
+
 case "${1:-}" in
 	identify-process)
 		identify_process "${2:-}" "${3:-}" || exit 1
@@ -314,8 +335,11 @@ case "${1:-}" in
 	pane-state)
 		pane_state "${2:-}" "${3:-}"
 		;;
+	pane-info)
+		pane_info "${2:-}" "${3:-}"
+		;;
 	*)
-		echo "usage: $0 identify-process <comm> <args> | pane-agent <pane_pid> | pane-state <pane_id> <pane_pid>" >&2
+		echo "usage: $0 identify-process <comm> <args> | pane-agent <pane_pid> | pane-state <pane_id> <pane_pid> | pane-info <pane_id> <pane_pid>" >&2
 		exit 2
 		;;
 esac

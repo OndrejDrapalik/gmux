@@ -36,8 +36,10 @@ scripts.
 - **Pane layout helpers**: recursive split, clockwise pane cycling, directional
   pane swaps with focus follow, half-zoom, and size cycling are available as
   scripts and keybindings.
-- **Two keybinding modes**: use the opinionated gmux flavor, or keep stock tmux
-  bindings with the same status bar and observability layer.
+- **Focus and templates**: spotlight the current pane in a popup, or launch a
+  repeatable workspace from JSON templates.
+- **Usage header**: the top-right status can show Codex, Claude, Cursor, and
+  daily spend through CodexBar.
 
 ## Who It Is For
 
@@ -53,20 +55,20 @@ cd gmux
 
 mkdir -p ~/.tmux ~/.config/zsh
 ln -sf "$(pwd)/dotfiles/tmux.conf" ~/.tmux.conf
-ln -sf "$(pwd)/dotfiles/tmux/base.conf" ~/.tmux/base.conf
-ln -sf "$(pwd)/dotfiles/tmux/keys-gmux.conf" ~/.tmux/keys-gmux.conf
-ln -sf "$(pwd)/dotfiles/tmux/keys-vanilla.conf" ~/.tmux/keys-vanilla.conf
 rm -rf ~/.tmux/scripts
 cp -R dotfiles/tmux/scripts ~/.tmux/scripts
 chmod +x ~/.tmux/scripts/*.sh
+mkdir -p ~/.config/gmux
+cp -R dotfiles/config/gmux/templates ~/.config/gmux/templates
 ```
 
-Optional Ghostty and zsh files:
+Optional Ghostty, zsh, and legacy template files:
 
 ```sh
-mkdir -p ~/.config/ghostty ~/.config/zsh
+mkdir -p ~/.config/ghostty ~/.config/zsh ~/.config/tmux-gmux
 cp dotfiles/config/ghostty/config ~/.config/ghostty/config
 cp dotfiles/config/zsh/fzf-tab-config.zsh ~/.config/zsh/fzf-tab-config.zsh
+cp -R dotfiles/config/tmux-gmux/templates ~/.config/tmux-gmux/templates
 ```
 
 Start tmux normally:
@@ -75,18 +77,11 @@ Start tmux normally:
 tmux
 ```
 
-Use the stock tmux keybinding flavor:
-
-```sh
-GMUX_FLAVOR=vanilla tmux
-```
-
 ## Test in Docker
 
 ```sh
 docker build -t gmux-test .
-docker run -it --rm gmux-test            # gmux flavor
-docker run -it --rm gmux-test vanilla    # vanilla flavor
+docker run -it --rm gmux-test
 ```
 
 ## What's Inside
@@ -94,11 +89,10 @@ docker run -it --rm gmux-test vanilla    # vanilla flavor
 | Layer | File | Purpose |
 | --- | --- | --- |
 | Ghostty | `dotfiles/config/ghostty/config` | Cmd-key to tmux Meta passthrough, Tokyo Night theme, background blur |
-| tmux | `dotfiles/tmux.conf` | Entry point that sources the shared base and selected keybinding flavor |
-| tmux | `dotfiles/tmux/base.conf` | Shared theme, status bar, hooks, plugins, port watcher, agent spinner |
-| tmux | `dotfiles/tmux/keys-gmux.conf` | Opinionated `C-Space` keybinding flavor |
-| tmux | `dotfiles/tmux/keys-vanilla.conf` | Stock `C-b` keybinding flavor |
+| tmux | `dotfiles/tmux.conf` | Single merged tmux config: theme, status bar, hooks, plugins, keybindings |
 | tmux scripts | `dotfiles/tmux/scripts/` | Agent detection, spinner, port watcher, pane/layout helpers, refresh helpers |
+| gmux templates | `dotfiles/config/gmux/templates/` | JSON workspace templates used by `prefix G` |
+| legacy templates | `dotfiles/config/tmux-gmux/templates/` | Compatibility templates for older `tmux-templates.sh` notes |
 | zsh | `dotfiles/zshrc` | omz, git aliases, Claude Code environment |
 | zsh | `dotfiles/config/zsh/fzf-tab-config.zsh` | fzf-tab completion styling |
 | Docker | `Dockerfile` | Sandboxed test environment with the full gmux stack |
@@ -121,6 +115,19 @@ from task start to finish instead of flickering on and off.
 
 The status bar reads only tmux variables (`@busy`, `@spin`, `@wname`) — no
 shell forks inside format strings.
+
+### Usage Header
+
+`tmux-codexbar-usage.sh` updates `@codexbar_usage`, rendered in the top-right
+status header as:
+
+```text
+cdx -- | cl -- | cur -- | spend --
+```
+
+When CodexBar is installed, those four slots become Codex usage, Claude usage,
+Cursor usage, and total daily spend. The script is intentionally best-effort:
+without CodexBar or `jq`, the header stays present with `--` placeholders.
 
 `tmux-agent-detect.sh` provides the deeper process-tree detection (direct
 binaries, common wrapper names, symlinked launchers, and runtime launches
@@ -153,10 +160,20 @@ express as one-line tmux bindings:
 - `recursive-split.sh`: split the active pane along its longer dimension.
 - `pane-cycle-clockwise.sh`: cycle panes by screen position instead of pane
   index.
-- `swap-pane-follow.sh`: swap in a direction and keep focus on the moved pane.
+- `swap-pane-stay.sh`: swap pane contents in a direction while keeping the
+  cursor in place.
 - `resize-cycle.sh`: cycle the active pane through 1/3, 1/2, and 2/3 sizes.
 - `half-zoom.sh`: toggle a vertical half-zoom inside the current column.
-- `tmux-cohort.sh`: save, offload, and restore named groups of sessions.
+- `custom-zoom.sh`: toggle a larger non-fullscreen zoom for the current pane.
+- `focus-mode.sh`: show the current pane in a temporary popup without reflowing
+  the background layout.
+- `tmux-cohort.sh`: restore named groups of sessions.
+
+### Template Picker
+
+`prefix G` opens `gmux-template-picker.sh`, which reads JSON files from
+`~/.config/gmux/templates`. It previews the chosen workspace and creates or
+switches to a session rooted at the current pane directory.
 
 ### Pane Layout Presets
 
@@ -171,21 +188,7 @@ One-keystroke layouts for agentic work, bound on the number row:
   the window width.
 - `prefix 0` equalizes everything back to a tiled layout.
 
-## Flavors
-
-Both flavors share the Tokyo Night status bar, agent indicators, port watcher,
-tmux-resurrect, and tmux-continuum.
-
-- **gmux**: default, `C-Space` prefix, remapped keys, Ghostty shortcuts.
-- **vanilla**: stock `C-b` prefix and default tmux bindings.
-
-Switch flavor with `GMUX_FLAVOR=vanilla tmux` or by exporting
-`GMUX_FLAVOR=vanilla` in your shell profile.
-
 ## Keybindings
-
-The tables below apply to the **gmux** flavor. Vanilla keeps stock tmux
-keybindings.
 
 `prefix` means `C-Space`.
 
@@ -226,6 +229,10 @@ keybindings.
 | **Reload config** | `prefix R` | Source `tmux.conf` without restarting |
 | **Rename pane** | `prefix T` | Name the current pane |
 | **Half-zoom** | `prefix V` | Toggle vertical half-zoom for the current pane column |
+| **Custom zoom** | `prefix Z` | Toggle 80% zoom without hiding neighboring panes |
+| **Focus popup** | `prefix S` / `prefix s` | Toggle a 90% popup for the current pane |
+| **Session tree** | `prefix f` | Open the tmux session tree |
+| **Template picker** | `prefix G` | Create or switch to a session from JSON templates |
 | **Work layout preset** | `prefix 8` | Three-pane layout from a clean window (editor / terminal / full-height right) |
 | **Weight top-left pane** | `prefix 9` | Left column 2/3 wide, top-left pane 2/3 tall |
 | **Weight right column** | `prefix (` | Right pane column 2/3 of the window width |
@@ -237,7 +244,6 @@ keybindings.
 | **Save session** | `prefix C-s` | tmux-resurrect save |
 | **Restore session** | `prefix C-r` | tmux-resurrect restore |
 | **Linked session** | `C-x` | Second view into the same session |
-| **Offload cohort** | `prefix S` | Open tmux-cohort offload popup |
 | **Restore cohort** | `prefix O` | Open tmux-cohort restore popup |
 
 ### Ghostty Shortcuts
@@ -246,16 +252,18 @@ These bypass tmux prefix by sending Meta sequences from Ghostty.
 
 | Shortcut | Action |
 | --- | --- |
-| `Cmd+1` / `Cmd+2` | Previous / next window |
-| `Cmd+Shift+[` / `Cmd+Shift+]` | Previous / next window |
+| `Cmd+1` / `Cmd+2` | Previous / next window; close Focus popup when active |
 | <code>Cmd+`</code> | Cycle clockwise through panes |
-| `Cmd+3` | Cycle counter-clockwise through panes |
+| <code>Opt+`</code> | Rotate pane contents clockwise; rotate focused pane in Focus popup |
+| `Cmd+3` | Previous pane |
 | `Opt+Cmd+1` / `Opt+Cmd+2` | Reorder window left / right |
 | `Cmd+Shift+K` | Clear screen and scrollback |
+| `Cmd+Opt+K` | Clear visible screen, preserving history |
 | `Cmd+H/J/K/L` | Move focus left / down / up / right |
-| `Opt+Cmd+H/J/K/L` | Swap pane left / down / up / right and follow focus |
+| `Opt+H/J/K/L` | Swap pane contents left / down / up / right |
+| `Opt+Shift+H/J/K/L` | Resize the pane line through thirds |
 | `Cmd+P` | Recursive split |
-| `Cmd+Shift+P` | Copy current pane path |
+| `Cmd+Shift+P` | Recursive split, vertical-first |
 | `Hyper+M` | Toggle pane zoom |
 
 ## Development Checks
