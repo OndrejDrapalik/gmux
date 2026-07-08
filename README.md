@@ -1,4 +1,4 @@
-# gmux
+# <img src="assets/logo.svg" alt="gmux logo" width="28" /> gmux
 
 **Ghostty x tmux configuration for agentic coding.** Run coding agents, dev
 servers, and shells in one terminal workspace — agent activity in the status
