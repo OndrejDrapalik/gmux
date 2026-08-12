@@ -7,7 +7,7 @@ scripts.
 
 <p>
   <a href="https://claude.com/claude-code"><img src="assets/logos/claude.svg" alt="Claude Code"></a>&nbsp;&nbsp;
-  <a href="https://openai.com/codex"><img src="assets/logos/codex.svg" alt="Codex CLI"></a>&nbsp;&nbsp;
+  <a href="https://github.com/openai/codex"><img src="assets/logos/codex.svg" alt="Codex CLI"></a>&nbsp;&nbsp;
   <a href="https://github.com/google-gemini/gemini-cli"><img src="assets/logos/gemini.svg" alt="Gemini CLI"></a>&nbsp;&nbsp;
   <a href="https://opencode.ai"><img src="assets/logos/opencode.svg" alt="opencode"></a>&nbsp;&nbsp;
   <a href="https://cursor.com"><img src="assets/logos/cursor.svg" alt="Cursor Agent"></a>&nbsp;&nbsp;
